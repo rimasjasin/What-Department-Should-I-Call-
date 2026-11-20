@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sort It Out</title>
+<!-- Sort It Out: a two-player team sorting game. Self-contained: no outside files, no data collected. -->
+<style>
+:root{
+  --bg:#EAF0F3; --ink:#1F2C36; --soft:#5B6B77; --panel:#FFFFFF; --line:#C9D4DB;
+  --note:#FFE58F; --note-ink:#3A2F0B; --good:#2E9E5B; --oops:#C2563F;
+  --hr:#E2705A; --fin:#D99A1E; --it:#3C7DD9; --bld:#239486; --com:#8A5CE6; --pro:#D44E86;
+  color-scheme:light;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg:#16212A; --ink:#EEF3F6; --soft:#A9B8C3; --panel:#22303B; --line:#3A4A57;
+    --note:#E9CF72; --note-ink:#2A2208; color-scheme:dark;
+  }
+}
+*,*::before,*::after{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{
+  margin:0;min-height:100%;background:var(--bg);color:var(--ink);
+  font-family:ui-rounded,"SF Pro Rounded","Segoe UI","Helvetica Neue",Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;overflow-x:hidden;
+}
+.wrap{max-width:640px;margin:0 auto;padding:16px}
+.screen{display:none}
+.screen.on{display:block}
+
+/* Start + end */
+.center{text-align:center;padding-top:6vh}
+h1{font-size:clamp(2.4rem,9vw,3.4rem);margin:0 0 6px;letter-spacing:-0.02em}
+.lead{font-size:1.15rem;line-height:1.5;color:var(--soft);max-width:30em;margin:0 auto 26px}
+.btn{
+  font:inherit;font-size:1.2rem;font-weight:700;min-height:56px;padding:0 34px;
+  border:0;border-radius:28px;background:var(--ink);color:var(--bg);cursor:pointer;
+}
+.btn:focus-visible,.tile:focus-visible{outline:3px solid var(--it);outline-offset:3px}
+.stack{display:flex;justify-content:center;gap:10px;margin:0 auto 26px;flex-wrap:wrap}
+.chip{width:44px;height:44px;border-radius:12px;display:grid;place-items:center;color:#fff}
+.chip svg{width:26px;height:26px}
+
+/* Game top bar */
+.bar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.turn{font-weight:800;font-size:1.05rem;padding:8px 14px;border-radius:20px;background:var(--panel);border:2px solid var(--line)}
+.score{display:flex;gap:14px;font-size:1rem;color:var(--soft)}
+.score b{color:var(--ink);font-size:1.2rem}
+
+/* Sticky note */
+.deskarea{position:relative;display:flex;justify-content:center;margin:6px 0 10px}
+.note{
+  position:relative;width:min(100%,420px);min-height:150px;padding:30px 24px 22px;
+  background:var(--note);color:var(--note-ink);border-radius:4px 4px 18px 4px;
+  font-size:clamp(1.2rem,4.6vw,1.45rem);line-height:1.4;font-weight:600;text-align:center;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 10px 18px -10px rgba(40,30,0,.45);transform:rotate(-1.5deg);
+}
+.note::before{
+  content:"";position:absolute;top:-10px;left:50%;width:90px;height:22px;margin-left:-45px;
+  background:rgba(255,255,255,.55);border:1px solid rgba(0,0,0,.06);transform:rotate(2deg);
+}
+.note.in{animation:drop .35s ease-out}
+.note.out{animation:fly .5s ease-in forwards}
+@keyframes drop{from{opacity:0;transform:translateY(-24px) rotate(-6deg)}to{opacity:1;transform:rotate(-1.5deg)}}
+@keyframes fly{to{opacity:0;transform:translateY(40px) scale(.7) rotate(8deg)}}
+
+.msg{min-height:1.6em;text-align:center;font-weight:700;font-size:1.1rem;margin:4px 0 12px}
+.msg.good{color:var(--good)}
+.msg.oops{color:var(--oops)}
+
+/* Department tiles */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media (max-width:480px){.grid{grid-template-columns:repeat(2,1fr)}}
+.tile{
+  font:inherit;cursor:pointer;min-height:84px;border-radius:16px;border:3px solid var(--c);
+  background:var(--panel);color:var(--ink);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:10px 6px;font-weight:700;font-size:1rem;
+  transition:transform .12s;
+}
+.tile:active{transform:scale(.96)}
+.tile .ic{width:40px;height:40px;border-radius:11px;background:var(--c);color:#fff;display:grid;place-items:center}
+.tile .ic svg{width:26px;height:26px}
+.tile.right{background:var(--c);color:#fff;animation:pop .45s ease-out}
+.tile.right .ic{background:rgba(255,255,255,.25)}
+.tile.wrong{opacity:.4;animation:shake .35s}
+@keyframes pop{40%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+/* Confetti */
+.bit{position:absolute;left:50%;top:50%;width:10px;height:10px;border-radius:2px;pointer-events:none;
+  animation:burst .9s ease-out forwards}
+@keyframes burst{to{transform:translate(var(--x),var(--y)) rotate(var(--r));opacity:0}}
+
+/* End */
+.big{font-size:4rem;font-weight:800;margin:6px 0 0;line-height:1}
+.biglabel{color:var(--soft);font-size:1.1rem;margin-bottom:14px}
+.rating{font-size:1.4rem;font-weight:800;margin:0 0 20px}
+.players{display:flex;justify-content:center;gap:12px;flex-wrap:wrap;margin-bottom:28px}
+.pcard{background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:14px 18px;min-width:140px}
+.pcard b{display:block;font-size:2rem}
+.pcard span{color:var(--soft);font-size:.95rem}
+
+@media (prefers-reduced-motion: reduce){
+  *{animation:none!important;transition:none!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <section id="start" class="screen on center">
+    <div class="stack" id="startIcons"></div>
+    <h1>Sort It Out</h1>
+    <p class="lead">Read each sticky note and tap the team that should handle it. Take turns calling it, and work together to sort all 10 with as few mistakes as you can.</p>
+    <button class="btn" id="startBtn">Start</button>
+  </section>
+
+  <section id="game" class="screen">
+    <div class="bar">
+      <div class="turn" id="turn">Player 1’s turn</div>
+      <div class="score">
+        <span>Sorted <b id="done">0</b>/10</span>
+        <span>Mistakes <b id="miss">0</b></span>
+      </div>
+    </div>
+    <div class="deskarea" id="desk"><div class="note" id="note"></div></div>
+    <div class="msg" id="msg" aria-live="polite"></div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <section id="end" class="screen center">
+    <h1>All sorted!</h1>
+    <div class="big" id="endMiss">0</div>
+    <div class="biglabel" id="endMissLabel">mistakes</div>
+    <p class="rating" id="rating"></p>
+    <div class="players">
+      <div class="pcard"><span>Player 1</span><b id="p1">0</b><span>right on first try</span></div>
+      <div class="pcard"><span>Player 2</span><b id="p2">0</b><span>right on first try</span></div>
+    </div>
+    <button class="btn" id="againBtn">Play again</button>
+  </section>
+
+</div>
+<script>
+const ICONS = {
+  hr:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.5"/><path d="M2.5 20c0-3.3 2.5-6 5.5-6s5.5 2.7 5.5 6"/><path d="M14 14.5c.8-.3 1.6-.5 2.5-.5 2.8 0 5 2.4 5 5.5"/></svg>',
+  fin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M15 9c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.4 0-2.6-.6-3-1.6"/><path d="M12 6v1.5M12 16.5V18"/></svg>',
+  it:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="5" width="16" height="11" rx="1.5"/><path d="M2 19h20"/></svg>',
+  bld:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3 11l9-7 9 7"/><path d="M5 9.5V20h14V9.5"/><path d="M10 20v-5h4v5"/></svg>',
+  com:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M3 10v4h4l8 5V5L7 10H3z"/><path d="M18.5 9a4 4 0 010 6"/></svg>',
+  pro:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10A4.3 4.3 0 0112 7.3 4.3 4.3 0 0119.5 10c0 5.4-7.5 10-7.5 10z"/></svg>'
+};
+const DEPTS = [
+  {id:'hr',  name:'People & HR',    c:'--hr'},
+  {id:'fin', name:'Finance',        c:'--fin'},
+  {id:'it',  name:'Tech Help',      c:'--it'},
+  {id:'bld', name:'Building',       c:'--bld'},
+  {id:'com', name:'Communications', c:'--com'},
+  {id:'pro', name:'Programs',       c:'--pro'}
+];
+const TASKS = [
+  {t:'A new hire needs to fill out tax and benefits forms.', d:'hr'},
+  {t:'I want to request vacation days next month.', d:'hr'},
+  {t:'We need to post a job opening for a case manager.', d:'hr'},
+  {t:'A staff member has a question about their health insurance.', d:'hr'},
+  {t:'A vendor says their invoice has not been paid.', d:'fin'},
+  {t:'I need to be paid back for my travel costs.', d:'fin'},
+  {t:'How much of this year’s budget is left?', d:'fin'},
+  {t:'A check arrived in the mail and needs to be deposited.', d:'fin'},
+  {t:'I forgot my email password and I’m locked out.', d:'it'},
+  {t:'My laptop won’t connect to the Wi-Fi.', d:'it'},
+  {t:'A new staff member needs a login for their laptop.', d:'it'},
+  {t:'I got a strange email asking me to click a link.', d:'it'},
+  {t:'Water is leaking under the kitchen sink.', d:'bld'},
+  {t:'The heat isn’t working in the meeting room.', d:'bld'},
+  {t:'A light is out in the stairwell.', d:'bld'},
+  {t:'Six folding tables need to be carried to the hall.', d:'bld'},
+  {t:'We want to post event photos on social media.', d:'com'},
+  {t:'A reporter called asking for an interview.', d:'com'},
+  {t:'The monthly newsletter needs to be written.', d:'com'},
+  {t:'We need a flyer designed for our open house.', d:'com'},
+  {t:'An older adult wants to sign up for an art class.', d:'pro'},
+  {t:'A caregiver is asking about support groups.', d:'pro'},
+  {t:'A member needs help finding home care services.', d:'pro'},
+  {t:'We want to start a new exercise class at the center.', d:'pro'}
+];
+const ROUNDS = 10;
+const $ = id => document.getElementById(id);
+let deck, i, mistakes, player, firstTry, triedWrong, locked;
+
+function shuffle(a){a=a.slice();for(let k=a.length-1;k>0;k--){const j=Math.floor(Math.random()*(k+1));[a[k],a[j]]=[a[j],a[k]];}return a;}
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('on',s.id===id));window.scrollTo(0,0);}
+
+$('startIcons').innerHTML = DEPTS.map(d=>`<div class="chip" style="background:var(${d.c})">${ICONS[d.id]}</div>`).join('');
+
+$('grid').innerHTML = DEPTS.map(d=>
+  `<button class="tile" data-d="${d.id}" style="--c:var(${d.c})"><span class="ic">${ICONS[d.id]}</span>${d.name}</button>`
+).join('');
+document.querySelectorAll('.tile').forEach(b=>b.addEventListener('click',()=>pick(b)));
+
+function newGame(){
+  deck = shuffle(TASKS).slice(0,ROUNDS);
+  i=0; mistakes=0; player=0; firstTry=[0,0];
+  show('game'); deal();
+}
+function deal(){
+  triedWrong=false; locked=false;
+  document.querySelectorAll('.tile').forEach(b=>b.classList.remove('right','wrong'));
+  const n=$('note'); n.textContent=deck[i].t;
+  n.classList.remove('out','in'); void n.offsetWidth; n.classList.add('in');
+  $('turn').textContent=`Player ${player+1}’s turn`;
+  $('msg').textContent=''; $('msg').className='msg';
+  $('done').textContent=i; $('miss').textContent=mistakes;
+}
+function pick(btn){
+  if(locked) return;
+  if(btn.dataset.d===deck[i].d){
+    locked=true;
+    if(!triedWrong) firstTry[player]++;
+    btn.classList.add('right');
+    $('msg').textContent='Yes! That’s the right team.'; $('msg').className='msg good';
+    $('done').textContent=i+1;
+    confetti();
+    setTimeout(()=>$('note').classList.add('out'),350);
+    setTimeout(next,1100);
+  } else {
+    if(btn.classList.contains('wrong')) return;
+    mistakes++; triedWrong=true;
+    btn.classList.add('wrong');
+    $('miss').textContent=mistakes;
+    $('msg').textContent='Not quite. Try another team!'; $('msg').className='msg oops';
+  }
+}
+function next(){
+  i++; player=1-player;
+  if(i>=ROUNDS) finish(); else deal();
+}
+function finish(){
+  $('endMiss').textContent=mistakes;
+  $('endMissLabel').textContent = mistakes===1 ? 'mistake' : 'mistakes';
+  $('rating').textContent =
+    mistakes===0 ? 'Perfect teamwork!' :
+    mistakes<=2  ? 'Great teamwork!' :
+    mistakes<=5  ? 'Nice job. You two know this place.' :
+                   'Good start. Play again and beat your score!';
+  $('p1').textContent=firstTry[0]; $('p2').textContent=firstTry[1];
+  show('end');
+}
+function confetti(){
+  const desk=$('desk'), cols=DEPTS.map(d=>`var(${d.c})`);
+  for(let k=0;k<16;k++){
+    const s=document.createElement('span'); s.className='bit';
+    const ang=Math.random()*Math.PI*2, dist=70+Math.random()*90;
+    s.style.background=cols[k%cols.length];
+    s.style.setProperty('--x',Math.cos(ang)*dist+'px');
+    s.style.setProperty('--y',Math.sin(ang)*dist+'px');
+    s.style.setProperty('--r',(Math.random()*540-270)+'deg');
+    desk.appendChild(s); setTimeout(()=>s.remove(),950);
+  }
+}
+$('startBtn').addEventListener('click',newGame);
+$('againBtn').addEventListener('click',newGame);
+</script>
+</body>
+</html>
